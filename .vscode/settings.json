@@ -1,4 +1,15 @@
 {
   "DockerRun.DisableDockerrc": true,
-  "DockerRun.Containers": ["e1211eff0295"]
+  "DockerRun.Containers": ["e1211eff0295"],
+  "cSpell.words": [
+    "automount",
+    "Autoscaler",
+    "fullname",
+    "kaas",
+    "mysecret",
+    "اپلیکیشن",
+    "تعریف",
+    "رپلیکاها",
+    "مشخصات"
+  ]
 }
