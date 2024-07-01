@@ -1,0 +1,20 @@
+apiVersion: v2
+name: nginx
+description: A Helm chart for Kubernetes to deploy nginx with HPA
+type: application
+version: 0.1.0
+appVersion: 1.17.4
+maintainers:
+  - name: YourName
+    email: yourname@example.com
+keywords:
+  - nginx
+  - hpa
+  - kubernetes
+sources:
+  - https://github.com/yourusername/nginx-chart
+dependencies:
+  - name: metrics-server
+    version: 5.10.10
+    repository: https://kubernetes-sigs.github.io/metrics-server/
+home: https://nginx.org
