@@ -1,0 +1,18 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kaas-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kaas-api  # نام Deployment که می‌خواهیم آن را مقیاس‌پذیر کنیم
+  minReplicas: 2  # حداقل تعداد پاد‌ها
+  maxReplicas: 5  # حداکثر تعداد پاد‌ها
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50  # درصد مصرف میانگین CPU
