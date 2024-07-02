@@ -4,6 +4,6 @@ services:
 
   flask_app:
     build: "/"
-    image: kaas-sarvin-abtin
+    image: kaas-sarvin-abtin:latest
     ports:
       - "5000:5000"
