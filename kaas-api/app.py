@@ -22,8 +22,11 @@ apps_v1 = client.AppsV1Api()
 
 apps_version = "apps/v1"
 
+
 @app.route('/deploy', methods=['POST'])
+@REQUEST_LATENCY.time()
 def deploy_app():
+    REQUEST_COUNT.inc()
     data = request.get_json()
     app_name = data.get('appName')
     replicas = data.get('replicas', 1)
@@ -37,15 +40,10 @@ def deploy_app():
     domain_address = data.get('domainAddress')
 
     # Define environment variables
-    env_vars = []
-    for env in envs:
-        env_vars.append(client.V1EnvVar(name=env['name'], value=env['value']))
+    env_vars = [client.V1EnvVar(name=env['name'], value=env['value']) for env in envs]
 
     # Define secrets (if any)
-    secret_volumes = []
-    for secret in secrets:
-        secret_volumes.append(client.V1VolumeMount(name=secret['name'], mount_path=secret['mountPath']))
-
+    secret_volumes = [client.V1VolumeMount(name=secret['name'], mount_path=secret['mountPath']) for secret in secrets]
 
     # Define the container spec
     container = client.V1Container(
@@ -55,7 +53,8 @@ def deploy_app():
         resources=client.V1ResourceRequirements(
             requests=resources.get('requests', {}),
             limits=resources.get('limits', {})
-        )
+        ),
+        env=env_vars
     )
 
     # Create the deployment spec
@@ -81,10 +80,10 @@ def deploy_app():
     )
 
     # Create the deployment
-    apps_v1 = client.AppsV1Api()
     try:
         apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
     except client.ApiException as e:
+        FAILED_REQUEST_COUNT.inc()
         return jsonify({"error": str(e)}), 500
 
     # Optionally create a service
@@ -99,41 +98,11 @@ def deploy_app():
                 type="NodePort"
             )
         )
-        core_v1 = client.CoreV1Api()
         try:
-            core_v1.create_namespaced_service(namespace="default", body=service)
+            v1.create_namespaced_service(namespace="default", body=service)
         except client.ApiException as e:
+            FAILED_REQUEST_COUNT.inc()
             return jsonify({"error": str(e)}), 500
-
-    # # Optionally create an Ingress
-    # if domain_address:
-    #     ingress = client.NetworkingV1Api(
-    #         api_version="networking.k8s.io/v1",
-    #         kind="Ingress",
-    #         metadata=client.V1ObjectMeta(name=app_name),
-    #         spec=client.NetworkingV1IngressSpec(
-    #             rules=[
-    #                 client.NetworkingV1IngressRule(
-    #                     host=f"{app_name}.{domain_address}",
-    #                     http=client.NetworkingV1HTTPIngressRuleValue(
-    #                         paths=[
-    #                             client.NetworkingV1HTTPIngressPath(
-    #                                 path="/",
-    #                                 backend=client.NetworkingV1IngressBackend(
-    #                                     service_name=app_name,
-    #                                     service_port=client.IntOrString(int_value=service_port)
-    #                                 )
-    #                             )
-    #                         ]
-    #                     )
-    #                 )
-    #             ]
-    #         )
-    #     )
-    #     try:
-    #         networking_v1.create_namespaced_ingress(namespace="default", body=ingress)
-    #     except client.ApiException as e:
-    #         return jsonify({"error": str(e)}), 500
 
     return jsonify({"message": "App deployed successfully"})
 
@@ -262,7 +231,6 @@ def self_service_postgres():
 
     return jsonify({"kaas/postgres-self-service: your postgres app is ready": app_name}), 200
         
-# Monitoring CronJob
 @app.route('/monitor/cronjob', methods=['POST'])
 def create_monitor_cronjob():
     data = request.get_json()
