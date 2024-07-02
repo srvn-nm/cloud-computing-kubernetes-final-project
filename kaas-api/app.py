@@ -189,7 +189,6 @@ def get_all_app_statuses():
         external(true,false)
 '''
 @app.route('/deployment/self-service/postgres', methods=['POST'])
-@app.route('/deployment/self-service/postgres', methods=['POST'])
 def self_service_postgres():
 
     data = request.get_json()
