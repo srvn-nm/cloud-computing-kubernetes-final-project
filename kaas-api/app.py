@@ -83,7 +83,7 @@ def deploy_app():
         apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
     except client.ApiException as e:
         FAILED_REQUEST_COUNT.inc()
-        return jsonify({"kaas postgres-self-service internal error": str(e)}), 500
+        return jsonify({"kaas internal error": str(e)}), 500
 
     # Optionally create a service
     if external_access:
@@ -101,7 +101,7 @@ def deploy_app():
             v1.create_namespaced_service(namespace="default", body=service)
         except client.ApiException as e:
             FAILED_REQUEST_COUNT.inc()
-            return jsonify({"kaas postgres-self-service internal error": str(e)}), 500
+            return jsonify({"kaas internal error": str(e)}), 500
 
     # # Optionally create an Ingress
     # if domain_address:
@@ -377,7 +377,7 @@ def get_app_health(app_name):
 '''
 @app.route('/metrics/prometheus', methods=['GET'])
 def prometheus_metrics():
-    return jsonify(generate_latest()), 200
+    return generate_latest()
 
 if __name__ == '__main__':
     app.run(debug=True)
