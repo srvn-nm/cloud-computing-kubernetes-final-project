@@ -348,5 +348,16 @@ def get_app_health(app_name):
     except client.exceptions.ApiException as e:
         return jsonify({"get health internal error": str(e)}), 500
 
+'''
+    this function is a prometheus metrics generator
+    method: GET
+    returns:
+        generate_latest: 
+            Returns the metrics from the registry in latest text format as a string.
+'''
+@app.route('/metrics/prometheus', methods=['GET'])
+def prometheus_metrics():
+    return jsonify(generate_latest()), 200
+
 if __name__ == '__main__':
     app.run(debug=True)
