@@ -25,17 +25,13 @@ def deploy_app():
     secrets = data.get('secrets', [])
     external_access = data.get('externalAccess', False)
     domain_address = data.get('domainAddress')
+    monitor = data.get('monitor', 'false')
 
     # Define environment variables
-    env_vars = []
-    for env in envs:
-        env_vars.append(client.V1EnvVar(name=env['name'], value=env['value']))
+    env_vars = [client.V1EnvVar(name=env['name'], value=env['value']) for env in envs]
 
     # Define secrets (if any)
-    secret_volumes = []
-    for secret in secrets:
-        secret_volumes.append(client.V1VolumeMount(name=secret['name'], mount_path=secret['mountPath']))
-
+    secret_volumes = [client.V1VolumeMount(name=secret['name'], mount_path=secret['mountPath']) for secret in secrets]
 
     # Define the container spec
     container = client.V1Container(
@@ -45,16 +41,21 @@ def deploy_app():
         resources=client.V1ResourceRequirements(
             requests=resources.get('requests', {}),
             limits=resources.get('limits', {})
-        )
+        ),
+        env=env_vars,
+        volume_mounts=secret_volumes
     )
+
+    # Define volumes for secrets
+    volumes = [client.V1Volume(
+        name=secret['name'],
+        secret=client.V1SecretVolumeSource(secret_name=secret['name'])
+    ) for secret in secrets]
 
     # Create the deployment spec
     template = client.V1PodTemplateSpec(
-        metadata=client.V1ObjectMeta(labels={"app": app_name}),
-        spec=client.V1PodSpec(
-            containers=[container],
-            volumes=[client.V1Volume(name=secret['name'], secret=client.V1SecretVolumeSource(secret_name=secret['name'])) for secret in secrets]
-        )
+        metadata=client.V1ObjectMeta(labels={"app": app_name, "monitor": monitor}),
+        spec=client.V1PodSpec(containers=[container], volumes=volumes)
     )
 
     spec = client.V1DeploymentSpec(
@@ -71,7 +72,6 @@ def deploy_app():
     )
 
     # Create the deployment
-    apps_v1 = client.AppsV1Api()
     try:
         apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
     except client.ApiException as e:
@@ -89,9 +89,8 @@ def deploy_app():
                 type="NodePort"
             )
         )
-        core_v1 = client.CoreV1Api()
         try:
-            core_v1.create_namespaced_service(namespace="default", body=service)
+            v1.create_namespaced_service(namespace="default", body=service)
         except client.ApiException as e:
             return jsonify({"error": str(e)}), 500
 
@@ -125,7 +124,7 @@ def deploy_app():
     #     except client.ApiException as e:
     #         return jsonify({"error": str(e)}), 500
 
-    return jsonify({"message": "App deployed successfully"})
+    return jsonify({"message": "App deployed successfully"}), 200
 
 @app.route('/status/<string:app_name>', methods=['GET'])
 def get_app_status(app_name):
