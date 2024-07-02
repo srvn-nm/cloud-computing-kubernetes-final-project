@@ -177,6 +177,24 @@ def get_all_app_statuses():
 
     return jsonify(all_statuses)
 
+'''
+    this function is a self-service deployer for postgres database
+    method: POST
+    essential parameters:
+        appName
+        resources = {cpu , memory}
+        external
+'''
+@app.route('/deployment/self-service/postgres', methods=['POST'])
+def self_service_postgres():
+
+    #here we are taking users request from raw body
+    data = request.get_json()
+    app_name = data.get('appName')
+    resources = data.get('resources', {})
+    external = data.get('external', False)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
