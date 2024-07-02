@@ -2,9 +2,15 @@ from flask import Flask, request, jsonify
 from kubernetes import client, config
 from utils.postgres_utils import postgres_image,postgres_port, postgres_replicas
 import datetime
-from prometheus_client import Counter
+from prometheus_client import Counter, Histogram, generate_latest
 from kubernetes.client import V1CronJob, V1CronJobSpec, V1JobTemplateSpec, V1ObjectMeta, V1PodTemplateSpec, V1PodSpec, V1Container, V1EnvVar, V1VolumeMount, V1SecretVolumeSource, V1Volume
 
+
+# Prometheus metrics
+REQUEST_COUNT = Counter('request_count', 'Total number of requests')
+FAILED_REQUEST_COUNT = Counter('failed_request_count', 'Total number of failed requests')
+REQUEST_LATENCY = Histogram('request_latency_seconds', 'Request latency in seconds')
+DB_ERROR_COUNT = Counter('db_error_count', 'Total number of database errors')
 
 app = Flask(__name__)
 config.load_kube_config()
