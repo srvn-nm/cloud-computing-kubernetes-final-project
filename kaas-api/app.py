@@ -276,7 +276,7 @@ def create_monitor_cronjob():
                             containers=[
                                 V1Container(
                                     name='monitor-container',
-                                    image='your-monitor-image',
+                                    image='busybox:1.28',
                                     env=[
                                         V1EnvVar(name='ENV_VAR_NAME', value='env_var_value')
                                     ],
@@ -305,7 +305,7 @@ def create_monitor_cronjob():
     except client.ApiException as e:
         return jsonify({"error": str(e)}), 500
 
-    return jsonify({"message": "CronJob created successfully"})
+    return jsonify({"message": "CronJob created successfully"}), 200
 
 @app.route('/health/<string:app_name>', methods=['GET'])
 def get_app_health(app_name):
