@@ -1,3 +1,3 @@
-docker build  kaas-sarvin-abtin
+docker build kaas-sarvin-abtin
 
 dokcer-compose up -d
