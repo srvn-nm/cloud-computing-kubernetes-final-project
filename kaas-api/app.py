@@ -4,7 +4,9 @@ from kubernetes import client, config
 app = Flask(__name__)
 config.load_kube_config()
 
+#CoreV1Api: This is the primary API group in Kubernetes ,It provides access to most of the fundamental Kubernetes resources 
 v1 = client.CoreV1Api()
+#AppsV1Api: This API group is part of the "apps" API, which provides access to more complex, higher-level objects that manage applications.
 apps_v1 = client.AppsV1Api()
 
 @app.route('/deploy', methods=['POST'])
@@ -174,6 +176,7 @@ def get_all_app_statuses():
         })
 
     return jsonify(all_statuses)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
