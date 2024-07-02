@@ -25,13 +25,17 @@ def deploy_app():
     secrets = data.get('secrets', [])
     external_access = data.get('externalAccess', False)
     domain_address = data.get('domainAddress')
-    monitor = data.get('monitor', 'false')
 
     # Define environment variables
-    env_vars = [client.V1EnvVar(name=env['name'], value=env['value']) for env in envs]
+    env_vars = []
+    for env in envs:
+        env_vars.append(client.V1EnvVar(name=env['name'], value=env['value']))
 
     # Define secrets (if any)
-    secret_volumes = [client.V1VolumeMount(name=secret['name'], mount_path=secret['mountPath']) for secret in secrets]
+    secret_volumes = []
+    for secret in secrets:
+        secret_volumes.append(client.V1VolumeMount(name=secret['name'], mount_path=secret['mountPath']))
+
 
     # Define the container spec
     container = client.V1Container(
@@ -41,21 +45,16 @@ def deploy_app():
         resources=client.V1ResourceRequirements(
             requests=resources.get('requests', {}),
             limits=resources.get('limits', {})
-        ),
-        env=env_vars,
-        volume_mounts=secret_volumes
+        )
     )
-
-    # Define volumes for secrets
-    volumes = [client.V1Volume(
-        name=secret['name'],
-        secret=client.V1SecretVolumeSource(secret_name=secret['name'])
-    ) for secret in secrets]
 
     # Create the deployment spec
     template = client.V1PodTemplateSpec(
-        metadata=client.V1ObjectMeta(labels={"app": app_name, "monitor": monitor}),
-        spec=client.V1PodSpec(containers=[container], volumes=volumes)
+        metadata=client.V1ObjectMeta(labels={"app": app_name}),
+        spec=client.V1PodSpec(
+            containers=[container],
+            volumes=[client.V1Volume(name=secret['name'], secret=client.V1SecretVolumeSource(secret_name=secret['name'])) for secret in secrets]
+        )
     )
 
     spec = client.V1DeploymentSpec(
@@ -72,6 +71,7 @@ def deploy_app():
     )
 
     # Create the deployment
+    apps_v1 = client.AppsV1Api()
     try:
         apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
     except client.ApiException as e:
@@ -89,8 +89,9 @@ def deploy_app():
                 type="NodePort"
             )
         )
+        core_v1 = client.CoreV1Api()
         try:
-            v1.create_namespaced_service(namespace="default", body=service)
+            core_v1.create_namespaced_service(namespace="default", body=service)
         except client.ApiException as e:
             return jsonify({"error": str(e)}), 500
 
@@ -124,7 +125,7 @@ def deploy_app():
     #     except client.ApiException as e:
     #         return jsonify({"error": str(e)}), 500
 
-    return jsonify({"message": "App deployed successfully"}), 200
+    return jsonify({"message": "App deployed successfully"})
 
 @app.route('/status/<string:app_name>', methods=['GET'])
 def get_app_status(app_name):
@@ -188,15 +189,14 @@ def get_all_app_statuses():
         external(true,false)
 '''
 @app.route('/deployment/self-service/postgres', methods=['POST'])
+@app.route('/deployment/self-service/postgres', methods=['POST'])
 def self_service_postgres():
 
-    #here we are taking users request from raw body
     data = request.get_json()
     app_name = data.get('appName')
     resources = data.get('resources', {})
     external = data.get('external', False)
 
-    #now we are building our container which will have all needed configs for user
     container = client.V1Container(
         name=app_name,
         image=postgres_image,
@@ -211,8 +211,6 @@ def self_service_postgres():
             client.V1EnvVar(name="POSTGRES_PASSWORD", value="12345")
         ]
     )
-
-    # now lets create the deployment spec and template
 
     template = client.V1PodTemplateSpec(
         metadata=client.V1ObjectMeta(labels={"app": app_name}),
@@ -234,10 +232,29 @@ def self_service_postgres():
 
     try:
         apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
-    except client.ApiException as e:
-        return jsonify({"kaas postgres-self-service internal error": str(e)}), 500
+    except client.ApiException as error:
+        return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
+
+    if external:
+        service = client.V1Service(
+            api_version="v1",
+            kind="Service",
+            metadata=client.V1ObjectMeta(name=app_name),
+            spec=client.V1ServiceSpec(
+                selector={"app": app_name},
+                ports=[client.V1ServicePort(port=80, target_port=postgres_port)],
+                type="NodePort"
+            )
+        )
+        try:
+            v1.create_namespaced_service(namespace="default", body=service)
+        except client.ApiException as error:
+            return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
 
     return jsonify({"kaas/postgres-self-service: your postgres app is ready": app_name}), 200
+        
+
+    
 
 if __name__ == '__main__':
     app.run(debug=True)
