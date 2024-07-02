@@ -269,7 +269,17 @@ def self_service_postgres():
             return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
 
     return jsonify({"kaas/postgres-self-service: your postgres app is ready": app_name}), 200
-        
+
+'''
+    this function is a cronjob monitor creator
+    by calling this api we are able to set essential cronjob service with busybox:1.28
+    method: POST
+    essential parameters:
+        cron_schedule: this schedule parameter will set cronjob iterations time like each 5 second
+        namespace: namespace of cronjob section
+    returns:
+        message and results of this operation
+'''       
 @app.route('/monitor/cronjob', methods=['POST'])
 def create_monitor_cronjob():
     data = request.get_json()
@@ -320,6 +330,16 @@ def create_monitor_cronjob():
 
     return jsonify({"message": "CronJob created successfully"}), 200
 
+'''
+    this function is a cronjob monitor and health controller of apps
+    by calling this api we are able to find health status of given app_name
+    method: POST
+    essential parameters:
+        app_name: which app_name we wanna know its status
+    returns:
+        health_data:
+            deploymentName, replicas, readyReplicas, podStatuses, last_check
+'''    
 @app.route('/health/<string:app_name>', methods=['GET'])
 def get_app_health(app_name):
     try:
