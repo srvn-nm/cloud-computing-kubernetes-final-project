@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from kubernetes import client, config
 from utils.postgres_utils import postgres_image,postgres_port, postgres_replicas
+import datetime
 
 app = Flask(__name__)
 config.load_kube_config()
@@ -252,8 +253,76 @@ def self_service_postgres():
 
     return jsonify({"kaas/postgres-self-service: your postgres app is ready": app_name}), 200
         
+# Monitoring CronJob
+@app.route('/monitor/cronjob', methods=['POST'])
+def create_monitor_cronjob():
+    data = request.get_json()
+    cron_schedule = data.get('schedule', '*/5 * * * *')  # Default to every 5 seconds
+    namespace = data.get('namespace', 'default')
 
-    
+    job = client.V1JobTemplateSpec(
+        spec=client.V1JobSpec(
+            template=client.V1PodTemplateSpec(
+                spec=client.V1PodSpec(
+                    containers=[client.V1Container(
+                        name='monitor',
+                        image='appropriate/curl', 
+                        args=["/bin/sh", "-c", "python /scripts/monitor.py"]
+                    )],
+                    restart_policy='OnFailure'
+                )
+            )
+        )
+    )
+
+    cronjob = client.V1beta1CronJob(
+        api_version='batch/v1beta1',
+        kind='CronJob',
+        metadata=client.V1ObjectMeta(name='monitor-cronjob'),
+        spec=client.V1beta1CronJobSpec(
+            schedule=cron_schedule,
+            job_template=job
+        )
+    )
+
+    try:
+        batch_v1beta1 = client.BatchV1beta1Api()
+        batch_v1beta1.create_namespaced_cron_job(
+            namespace=namespace,
+            body=cronjob
+        )
+    except client.ApiException as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"message": "CronJob created successfully"}), 200
+
+@app.route('/health/<string:app_name>', methods=['GET'])
+def get_app_health(app_name):
+    try:
+        deployment = apps_v1.read_namespaced_deployment(name=app_name, namespace="default")
+        pods = v1.list_namespaced_pod(namespace="default", label_selector=f"app={app_name}")
+        
+        pod_statuses = []
+        for pod in pods.items:
+            pod_statuses.append({
+                "name": pod.metadata.name,
+                "phase": pod.status.phase,
+                "hostIP": pod.status.host_ip,
+                "podIP": pod.status.pod_ip,
+                "startTime": pod.status.start_time
+            })
+
+        health_data = {
+            "deploymentName": deployment.metadata.name,
+            "replicas": deployment.spec.replicas,
+            "readyReplicas": deployment.status.ready_replicas,
+            "podStatuses": pod_statuses,
+            "last_check": datetime.datetime.now().isoformat()
+        }
+
+        return jsonify(health_data)
+    except client.exceptions.ApiException as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
