@@ -320,9 +320,9 @@ def get_app_health(app_name):
             "last_check": datetime.datetime.now().isoformat()
         }
 
-        return jsonify(health_data)
+        return jsonify(health_data), 200
     except client.exceptions.ApiException as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"kaas postgres-self-service internal error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
