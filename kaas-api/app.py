@@ -238,7 +238,7 @@ def self_service_postgres():
     except client.ApiException as e:
         return jsonify({"kaas postgres-self-service internal error": str(e)}), 500
 
-    return jsonify({"kaas/postgres-self-service: your postgres app is ready": app_name}), 500
+    return jsonify({"kaas/postgres-self-service: your postgres app is ready": app_name}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
