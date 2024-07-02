@@ -186,7 +186,7 @@ def get_all_app_statuses():
     essential parameters:
         appName
         resources = {cpu , memory}
-        external
+        external(true,false)
 '''
 @app.route('/deployment/self-service/postgres', methods=['POST'])
 def self_service_postgres():
