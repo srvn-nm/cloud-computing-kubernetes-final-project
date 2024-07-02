@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from kubernetes import client, config
-from utils.postgres_utils import postgres_image,postgres_port
+from utils.postgres_utils import postgres_image,postgres_port, postgres_replicas
 
 app = Flask(__name__)
 config.load_kube_config()
@@ -9,6 +9,8 @@ config.load_kube_config()
 v1 = client.CoreV1Api()
 #AppsV1Api: This API group is part of the "apps" API, which provides access to more complex, higher-level objects that manage applications.
 apps_v1 = client.AppsV1Api()
+
+apps_version = "apps/v1"
 
 @app.route('/deploy', methods=['POST'])
 def deploy_app():
@@ -62,7 +64,7 @@ def deploy_app():
     )
 
     deployment = client.V1Deployment(
-        api_version="apps/v1",
+        api_version=apps_version,
         kind="Deployment",
         metadata=client.V1ObjectMeta(name=app_name),
         spec=spec
@@ -209,16 +211,34 @@ def self_service_postgres():
             client.V1EnvVar(name="POSTGRES_USER", value="kaas_user"),
             client.V1EnvVar(name="POSTGRES_PASSWORD", value="12345")
         ]
-    
-    # now lets create the deployment spec
+    )
 
-    #tmplates
+    # now lets create the deployment spec and template
+
     template = client.V1PodTemplateSpec(
         metadata=client.V1ObjectMeta(labels={"app": app_name}),
         spec=client.V1PodSpec(containers=[container])
     )
 
+    spec = client.V1DeploymentSpec(
+        replicas=postgres_replicas,
+        template=template,
+        selector={'matchLabels': {"app": app_name}}
+    )
 
+    deployment = client.V1Deployment(
+        api_version=apps_version,
+        kind="Deployment",
+        metadata=client.V1ObjectMeta(name=app_name),
+        spec=spec
+    )
+
+    try:
+        apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
+    except client.ApiException as e:
+        return jsonify({"kaas postgres-self-service internal error": str(e)}), 500
+
+    return jsonify({"kaas/postgres-self-service: your postgres app is ready": app_name}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
