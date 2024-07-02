@@ -22,7 +22,6 @@ apps_v1 = client.AppsV1Api()
 
 apps_version = "apps/v1"
 
-
 @app.route('/deploy', methods=['POST'])
 @REQUEST_LATENCY.time()
 def deploy_app():
@@ -84,7 +83,7 @@ def deploy_app():
         apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
     except client.ApiException as e:
         FAILED_REQUEST_COUNT.inc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"kaas postgres-self-service internal error": str(e)}), 500
 
     # Optionally create a service
     if external_access:
@@ -102,62 +101,99 @@ def deploy_app():
             v1.create_namespaced_service(namespace="default", body=service)
         except client.ApiException as e:
             FAILED_REQUEST_COUNT.inc()
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"kaas postgres-self-service internal error": str(e)}), 500
+
+    # # Optionally create an Ingress
+    # if domain_address:
+    #     ingress = client.NetworkingV1Api(
+    #         api_version="networking.k8s.io/v1",
+    #         kind="Ingress",
+    #         metadata=client.V1ObjectMeta(name=app_name),
+    #         spec=client.NetworkingV1IngressSpec(
+    #             rules=[
+    #                 client.NetworkingV1IngressRule(
+    #                     host=f"{app_name}.{domain_address}",
+    #                     http=client.NetworkingV1HTTPIngressRuleValue(
+    #                         paths=[
+    #                             client.NetworkingV1HTTPIngressPath(
+    #                                 path="/",
+    #                                 backend=client.NetworkingV1IngressBackend(
+    #                                     service_name=app_name,
+    #                                     service_port=client.IntOrString(int_value=service_port)
+    #                                 )
+    #                             )
+    #                         ]
+    #                     )
+    #                 )
+    #             ]
+    #         )
+    #     )
+    #     try:
+    #         networking_v1.create_namespaced_ingress(namespace="default", body=ingress)
+    #     except client.ApiException as e:
+    #         return jsonify({"error": str(e)}), 500
 
     return jsonify({"message": "App deployed successfully"})
 
 @app.route('/status/<string:app_name>', methods=['GET'])
+@REQUEST_LATENCY.time()
 def get_app_status(app_name):
-    # Get deployment status
-    deployment = apps_v1.read_namespaced_deployment(name=app_name, namespace="default")
-    pods = v1.list_namespaced_pod(namespace="default", label_selector=f"app={app_name}")
-    
-    pod_statuses = []
-    for pod in pods.items:
-        pod_statuses.append({
+    REQUEST_COUNT.inc()
+    try:
+        deployment = apps_v1.read_namespaced_deployment(name=app_name, namespace="default")
+        pods = v1.list_namespaced_pod(namespace="default", label_selector=f"app={app_name}")
+        
+        pod_statuses = [{
             "name": pod.metadata.name,
             "phase": pod.status.phase,
             "hostIP": pod.status.host_ip,
             "podIP": pod.status.pod_ip,
             "startTime": pod.status.start_time
-        })
+        } for pod in pods.items]
 
-    response = {
-        "deploymentName": deployment.metadata.name,
-        "replicas": deployment.spec.replicas,
-        "readyReplicas": deployment.status.ready_replicas,
-        "podStatuses": pod_statuses
-    }
+        response = {
+            "deploymentName": deployment.metadata.name,
+            "replicas": deployment.spec.replicas,
+            "readyReplicas": deployment.status.ready_replicas,
+            "podStatuses": pod_statuses
+        }
 
-    return jsonify(response)
+        return jsonify(response)
+    except client.ApiException as error:
+        FAILED_REQUEST_COUNT.inc()
+        return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
 
 @app.route('/statuses', methods=['GET'])
+@REQUEST_LATENCY.time()
 def get_all_app_statuses():
-    deployments = apps_v1.list_namespaced_deployment(namespace="default")
-    all_statuses = []
+    REQUEST_COUNT.inc()
+    try:
+        deployments = apps_v1.list_namespaced_deployment(namespace="default")
+        all_statuses = []
 
-    for deployment in deployments.items:
-        app_name = deployment.metadata.name
-        pods = v1.list_namespaced_pod(namespace="default", label_selector=f"app={app_name}")
-        
-        pod_statuses = []
-        for pod in pods.items:
-            pod_statuses.append({
+        for deployment in deployments.items:
+            app_name = deployment.metadata.name
+            pods = v1.list_namespaced_pod(namespace="default", label_selector=f"app={app_name}")
+            
+            pod_statuses = [{
                 "name": pod.metadata.name,
                 "phase": pod.status.phase,
                 "hostIP": pod.status.host_ip,
                 "podIP": pod.status.pod_ip,
                 "startTime": pod.status.start_time
+            } for pod in pods.items]
+
+            all_statuses.append({
+                "deploymentName": deployment.metadata.name,
+                "replicas": deployment.spec.replicas,
+                "readyReplicas": deployment.status.ready_replicas,
+                "podStatuses": pod_statuses
             })
 
-        all_statuses.append({
-            "deploymentName": deployment.metadata.name,
-            "replicas": deployment.spec.replicas,
-            "readyReplicas": deployment.status.ready_replicas,
-            "podStatuses": pod_statuses
-        })
-
-    return jsonify(all_statuses)
+        return jsonify(all_statuses)
+    except client.ApiException as error:
+        FAILED_REQUEST_COUNT.inc()
+        return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
 
 '''
     this function is a self-service deployer for postgres database
@@ -168,8 +204,9 @@ def get_all_app_statuses():
         external(true,false)
 '''
 @app.route('/deployment/self-service/postgres', methods=['POST'])
+@REQUEST_LATENCY.time()
 def self_service_postgres():
-
+    REQUEST_COUNT.inc()
     data = request.get_json()
     app_name = data.get('appName')
     resources = data.get('resources', {})
@@ -211,6 +248,7 @@ def self_service_postgres():
     try:
         apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
     except client.ApiException as error:
+        FAILED_REQUEST_COUNT.inc()
         return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
 
     if external:
@@ -227,6 +265,7 @@ def self_service_postgres():
         try:
             v1.create_namespaced_service(namespace="default", body=service)
         except client.ApiException as error:
+            FAILED_REQUEST_COUNT.inc()
             return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
 
     return jsonify({"kaas/postgres-self-service: your postgres app is ready": app_name}), 200
