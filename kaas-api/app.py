@@ -2,6 +2,9 @@ from flask import Flask, request, jsonify
 from kubernetes import client, config
 from utils.postgres_utils import postgres_image,postgres_port, postgres_replicas
 import datetime
+from prometheus_client import Counter
+from kubernetes.client import V1CronJob, V1CronJobSpec, V1JobTemplateSpec, V1ObjectMeta, V1PodTemplateSpec, V1PodSpec, V1Container, V1EnvVar, V1VolumeMount, V1SecretVolumeSource, V1Volume
+
 
 app = Flask(__name__)
 config.load_kube_config()
@@ -257,44 +260,52 @@ def self_service_postgres():
 @app.route('/monitor/cronjob', methods=['POST'])
 def create_monitor_cronjob():
     data = request.get_json()
-    cron_schedule = data.get('schedule', '*/5 * * * *')  # Default to every 5 seconds
+    cron_schedule = data.get('schedule')
     namespace = data.get('namespace', 'default')
 
-    job = client.V1JobTemplateSpec(
-        spec=client.V1JobSpec(
-            template=client.V1PodTemplateSpec(
-                spec=client.V1PodSpec(
-                    containers=[client.V1Container(
-                        name='monitor',
-                        image='appropriate/curl', 
-                        command= ["curl", "-s", "http://localhost:5000/monitor/cronjob"]
-                    )],
-                    restart_policy='OnFailure'
+    cronjob = V1CronJob(
+        api_version='batch/v1',
+        kind='CronJob',
+        metadata=V1ObjectMeta(name='monitor-cronjob'),
+        spec=V1CronJobSpec(
+            schedule=cron_schedule,
+            job_template=V1JobTemplateSpec(
+                spec=client.V1JobSpec(
+                    template=V1PodTemplateSpec(
+                        spec=V1PodSpec(
+                            containers=[
+                                V1Container(
+                                    name='monitor-container',
+                                    image='your-monitor-image',
+                                    env=[
+                                        V1EnvVar(name='ENV_VAR_NAME', value='env_var_value')
+                                    ],
+                                    volume_mounts=[
+                                        V1VolumeMount(name='secret-volume', mount_path='/etc/secret')
+                                    ]
+                                )
+                            ],
+                            restart_policy='OnFailure',
+                            volumes=[
+                                V1Volume(
+                                    name='secret-volume',
+                                    secret=V1SecretVolumeSource(secret_name='your-secret-name')
+                                )
+                            ]
+                        )
+                    )
                 )
             )
         )
     )
 
-    cronjob = client.V1beta1CronJob(
-        api_version='batch/v1beta1',
-        kind='CronJob',
-        metadata=client.V1ObjectMeta(name='monitor-cronjob'),
-        spec=client.V1beta1CronJobSpec(
-            schedule=cron_schedule,
-            job_template=job
-        )
-    )
-
     try:
-        batch_v1beta1 = client.BatchV1beta1Api()
-        batch_v1beta1.create_namespaced_cron_job(
-            namespace=namespace,
-            body=cronjob
-        )
+        batch_v1 = client.BatchV1Api()
+        batch_v1.create_namespaced_cron_job(namespace=namespace, body=cronjob)
     except client.ApiException as e:
         return jsonify({"error": str(e)}), 500
 
-    return jsonify({"message": "CronJob created successfully"}), 200
+    return jsonify({"message": "CronJob created successfully"})
 
 @app.route('/health/<string:app_name>', methods=['GET'])
 def get_app_health(app_name):
@@ -322,7 +333,7 @@ def get_app_health(app_name):
 
         return jsonify(health_data), 200
     except client.exceptions.ApiException as e:
-        return jsonify({"kaas postgres-self-service internal error": str(e)}), 500
+        return jsonify({"get health internal error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
