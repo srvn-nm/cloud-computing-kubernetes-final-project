@@ -209,7 +209,15 @@ def self_service_postgres():
             client.V1EnvVar(name="POSTGRES_USER", value="kaas_user"),
             client.V1EnvVar(name="POSTGRES_PASSWORD", value="12345")
         ]
+    
+    # now lets create the deployment spec
+
+    #tmplates
+    template = client.V1PodTemplateSpec(
+        metadata=client.V1ObjectMeta(labels={"app": app_name}),
+        spec=client.V1PodSpec(containers=[container])
     )
+
 
 
 if __name__ == '__main__':
