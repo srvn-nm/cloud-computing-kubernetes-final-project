@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from kubernetes import client, config
+from utils.postgres_utils import postgres_image,postgres_port
 
 app = Flask(__name__)
 config.load_kube_config()
@@ -194,6 +195,21 @@ def self_service_postgres():
     resources = data.get('resources', {})
     external = data.get('external', False)
 
+    #now we are building our container which will have all needed configs for user
+    container = client.V1Container(
+        name=app_name,
+        image=postgres_image,
+        ports=[client.V1ContainerPort(container_port=postgres_port)],
+        resources=client.V1ResourceRequirements(
+            requests=resources.get('requests', {}),
+            limits=resources.get('limits', {})
+        ),
+        env=[
+            client.V1EnvVar(name="POSTGRES_DB", value="postgres_db"),
+            client.V1EnvVar(name="POSTGRES_USER", value="kaas_user"),
+            client.V1EnvVar(name="POSTGRES_PASSWORD", value="12345")
+        ]
+    )
 
 
 if __name__ == '__main__':
