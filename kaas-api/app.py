@@ -267,7 +267,7 @@ def create_monitor_cronjob():
                     containers=[client.V1Container(
                         name='monitor',
                         image='appropriate/curl', 
-                        args=["/bin/sh", "-c", "python /scripts/monitor.py"]
+                        command= ["curl", "-s", "http://localhost:5000/monitor/cronjob"]
                     )],
                     restart_policy='OnFailure'
                 )
