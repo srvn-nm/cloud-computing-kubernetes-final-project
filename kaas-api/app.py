@@ -248,21 +248,33 @@ def self_service_postgres():
         )
     )
 
-    spec = client.V1DeploymentSpec(
+    spec = client.V1StatefulSetSpec(
         replicas=postgres_replicas,
+        serviceName="postgres",
         template=template,
-        selector={'matchLabels': {"app": app_name}}
+        selector={'matchLabels': {"app": app_name}},
+        volumeClaimTemplates=[
+            client.V1PersistentVolumeClaim(
+                metadata=client.V1ObjectMeta(name='postgres-storage'),
+                spec=client.V1PersistentVolumeClaimSpec(
+                    accessModes=['ReadWriteOnce'],
+                    resources=client.V1ResourceRequirements(
+                        requests={'storage': '1Gi'}
+                    )
+                )
+            )
+        ]
     )
 
-    deployment = client.V1Deployment(
+    statefulset = client.V1StatefulSet(
         api_version=apps_version,
-        kind="Deployment",
+        kind="StatefulSet",
         metadata=client.V1ObjectMeta(name=app_name),
         spec=spec
     )
 
     try:
-        apps_v1.create_namespaced_stateful_set(namespace="default", body=deployment)
+        apps_v1.create_namespaced_stateful_set(namespace="default", body=statefulset)
     except client.ApiException as error:
         FAILED_REQUEST_COUNT.inc()
         return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
