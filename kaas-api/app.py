@@ -257,7 +257,7 @@ def self_service_postgres():
             client.V1PersistentVolumeClaim(
                 metadata=client.V1ObjectMeta(name='postgres-storage'),
                 spec=client.V1PersistentVolumeClaimSpec(
-                    accessModes=['ReadWriteOnce'],
+                    access_modes=['ReadWriteOnce'],
                     resources=client.V1ResourceRequirements(
                         requests={'storage': '1Gi'}
                     )
