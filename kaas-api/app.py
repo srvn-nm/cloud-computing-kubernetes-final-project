@@ -37,6 +37,7 @@ def deploy_app():
     secrets = data.get('secrets', [])
     external_access = data.get('externalAccess', False)
     domain_address = data.get('domainAddress')
+    monitor = data.get('monitor', 'false')
 
     # Define environment variables
     env_vars = [client.V1EnvVar(name=env['name'], value=env['value']) for env in envs]
@@ -53,12 +54,13 @@ def deploy_app():
             requests=resources.get('requests', {}),
             limits=resources.get('limits', {})
         ),
-        env=env_vars
+        env=env_vars,
+        volume_mounts=secret_volumes
     )
 
     # Create the deployment spec
     template = client.V1PodTemplateSpec(
-        metadata=client.V1ObjectMeta(labels={"app": app_name}),
+        metadata=client.V1ObjectMeta(labels={"app": app_name, "monitor": monitor}),
         spec=client.V1PodSpec(
             containers=[container],
             volumes=[client.V1Volume(name=secret['name'], secret=client.V1SecretVolumeSource(secret_name=secret['name'])) for secret in secrets]
@@ -133,7 +135,7 @@ def deploy_app():
     #     except client.ApiException as e:
     #         return jsonify({"error": str(e)}), 500
 
-    return jsonify({"message": "App deployed successfully"})
+    return jsonify({"message": "App deployed successfully"}), 200
 
 @app.route('/status/<string:app_name>', methods=['GET'])
 @REQUEST_LATENCY.time()
