@@ -76,7 +76,7 @@ def deploy_app():
     deployment = client.V1Deployment(
         api_version=apps_version,
         kind="Deployment",
-        metadata=client.V1ObjectMeta(name=app_name),
+        metadata=client.V1ObjectMeta(name=app_name, labels={"monitor": monitor}),
         spec=spec
     )
 
