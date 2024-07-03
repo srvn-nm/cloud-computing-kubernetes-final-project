@@ -7,7 +7,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ${PWD}/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ${PWD}/prometheus.yml:/etc/prometheus/prometheus-configmap.yaml
 
   grafana:
     hostname: grafana
