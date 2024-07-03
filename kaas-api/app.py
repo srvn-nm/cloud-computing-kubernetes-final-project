@@ -226,12 +226,26 @@ def self_service_postgres():
             client.V1EnvVar(name="POSTGRES_DB", value="postgres_db"),
             client.V1EnvVar(name="POSTGRES_USER", value="kaas_user"),
             client.V1EnvVar(name="POSTGRES_PASSWORD", value="12345")
+        ],
+        volume_mounts=[
+            client.V1VolumeMount(
+                name='postgres-config',
+                mount_path='/etc/postgresql/'
+            )
         ]
     )
 
     template = client.V1PodTemplateSpec(
         metadata=client.V1ObjectMeta(labels={"app": app_name}),
-        spec=client.V1PodSpec(containers=[container])
+        spec=client.V1PodSpec(
+            containers=[container],
+            volumes=[
+                client.V1Volume(
+                    name='postgres-config',
+                    config_map=client.V1ConfigMapVolumeSource(name='postgres-config')
+                )
+            ]
+        )
     )
 
     spec = client.V1DeploymentSpec(
@@ -271,6 +285,7 @@ def self_service_postgres():
             return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
 
     return jsonify({"kaas/postgres-self-service: your postgres app is ready": app_name}), 200
+
 
 '''
     this function is a cronjob monitor creator
