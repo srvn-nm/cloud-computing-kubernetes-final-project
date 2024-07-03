@@ -2,8 +2,23 @@ version: '3.8'
 
 services:
 
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ${PWD}/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    hostname: grafana
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+ 
   flask_app:
     build: "/"
     image: kaas-sarvin-abtin:latest
     ports:
       - "5000:5000"
+    depends_on:
+      - prometheus
