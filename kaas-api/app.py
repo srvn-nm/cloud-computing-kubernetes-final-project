@@ -250,10 +250,10 @@ def self_service_postgres():
 
     spec = client.V1StatefulSetSpec(
         replicas=postgres_replicas,
-        serviceName="postgres",
+        service_name="postgres",
         template=template,
         selector={'matchLabels': {"app": app_name}},
-        volumeClaimTemplates=[
+        volume_claim_templates=[
             client.V1PersistentVolumeClaim(
                 metadata=client.V1ObjectMeta(name='postgres-storage'),
                 spec=client.V1PersistentVolumeClaimSpec(
