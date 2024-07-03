@@ -105,23 +105,26 @@ def deploy_app():
             FAILED_REQUEST_COUNT.inc()
             return jsonify({"kaas internal error": str(e)}), 500
 
-    # # Optionally create an Ingress
+    # Optionally create an Ingress
     # if domain_address:
-    #     ingress = client.NetworkingV1Api(
+    #     ingress = client.V1Ingress(
     #         api_version="networking.k8s.io/v1",
     #         kind="Ingress",
     #         metadata=client.V1ObjectMeta(name=app_name),
-    #         spec=client.NetworkingV1IngressSpec(
+    #         spec=client.V1IngressSpec(
     #             rules=[
-    #                 client.NetworkingV1IngressRule(
+    #                 client.V1IngressRule(
     #                     host=f"{app_name}.{domain_address}",
-    #                     http=client.NetworkingV1HTTPIngressRuleValue(
+    #                     http=client.V1HTTPIngressRuleValue(
     #                         paths=[
-    #                             client.NetworkingV1HTTPIngressPath(
+    #                             client.V1HTTPIngressPath(
     #                                 path="/",
-    #                                 backend=client.NetworkingV1IngressBackend(
-    #                                     service_name=app_name,
-    #                                     service_port=client.IntOrString(int_value=service_port)
+    #                                 path_type="Prefix",  # Adding path_type is often required
+    #                                 backend=client.V1IngressBackend(
+    #                                     service=client.V1IngressServiceBackend(
+    #                                         name=app_name,
+    #                                         port=client.V1ServiceBackendPort(number=service_port)
+    #                                     )
     #                                 )
     #                             )
     #                         ]
@@ -131,9 +134,11 @@ def deploy_app():
     #         )
     #     )
     #     try:
+    #         networking_v1 = client.NetworkingV1Api()
     #         networking_v1.create_namespaced_ingress(namespace="default", body=ingress)
     #     except client.ApiException as e:
     #         return jsonify({"error": str(e)}), 500
+
 
     return jsonify({"message": "App deployed successfully"}), 200
 
