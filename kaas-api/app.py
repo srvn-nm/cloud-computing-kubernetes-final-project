@@ -262,7 +262,7 @@ def self_service_postgres():
     )
 
     try:
-        apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
+        apps_v1.create_namespaced_stateful_set(namespace="default", body=deployment)
     except client.ApiException as error:
         FAILED_REQUEST_COUNT.inc()
         return jsonify({"kaas postgres-self-service internal error": str(error)}), 500
