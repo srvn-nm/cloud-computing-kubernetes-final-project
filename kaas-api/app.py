@@ -370,31 +370,38 @@ def create_monitor_cronjob():
             deploymentName, replicas, readyReplicas, podStatuses, last_check
 '''    
 @app.route('/health/<string:app_name>', methods=['GET'])
+@REQUEST_LATENCY.time()
 def get_app_health(app_name):
+    REQUEST_COUNT.inc()
     try:
+        # check if monitoring is enabled
         deployment = apps_v1.read_namespaced_deployment(name=app_name, namespace="default")
-        pods = v1.list_namespaced_pod(namespace="default", label_selector=f"app={app_name}")
-        
-        pod_statuses = []
-        for pod in pods.items:
-            pod_statuses.append({
-                "name": pod.metadata.name,
-                "phase": pod.status.phase,
-                "hostIP": pod.status.host_ip,
-                "podIP": pod.status.pod_ip,
-                "startTime": pod.status.start_time
-            })
+        if 'monitor' in deployment.metadata.labels and deployment.metadata.labels['monitor'] == "true":
+            pods = v1.list_namespaced_pod(namespace="default", label_selector=f"app={app_name}")
+            
+            pod_statuses = []
+            for pod in pods.items:
+                pod_statuses.append({
+                    "name": pod.metadata.name,
+                    "phase": pod.status.phase,
+                    "hostIP": pod.status.host_ip,
+                    "podIP": pod.status.pod_ip,
+                    "startTime": pod.status.start_time
+                })
 
-        health_data = {
-            "deploymentName": deployment.metadata.name,
-            "replicas": deployment.spec.replicas,
-            "readyReplicas": deployment.status.ready_replicas,
-            "podStatuses": pod_statuses,
-            "last_check": datetime.datetime.now().isoformat()
-        }
+            health_data = {
+                "deploymentName": deployment.metadata.name,
+                "replicas": deployment.spec.replicas,
+                "readyReplicas": deployment.status.ready_replicas,
+                "podStatuses": pod_statuses,
+                "last_check": datetime.datetime.now().isoformat()
+            }
 
-        return jsonify(health_data), 200
+            return jsonify(health_data), 200
+        else:
+            return jsonify({"error": "Monitoring is not enabled for this deployment."}), 400
     except client.exceptions.ApiException as e:
+        FAILED_REQUEST_COUNT.inc()
         return jsonify({"get health internal error": str(e)}), 500
 
 '''
