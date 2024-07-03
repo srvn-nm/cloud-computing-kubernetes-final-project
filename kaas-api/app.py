@@ -374,9 +374,11 @@ def create_monitor_cronjob():
 def get_app_health(app_name):
     REQUEST_COUNT.inc()
     try:
-        # check if monitoring is enabled
+       
         deployment = apps_v1.read_namespaced_deployment(name=app_name, namespace="default")
-        if 'monitor' in deployment.metadata.labels and deployment.metadata.labels['monitor'] == "true":
+
+        # Check if the deployment has labels and if monitoring is enabled
+        if deployment.metadata.labels and 'monitor' in deployment.metadata.labels and deployment.metadata.labels['monitor'] == "true":
             pods = v1.list_namespaced_pod(namespace="default", label_selector=f"app={app_name}")
             
             pod_statuses = []
@@ -403,6 +405,7 @@ def get_app_health(app_name):
     except client.exceptions.ApiException as e:
         FAILED_REQUEST_COUNT.inc()
         return jsonify({"get health internal error": str(e)}), 500
+
 
 '''
     this function is a prometheus metrics generator
